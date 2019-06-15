@@ -1,0 +1,22 @@
+{
+  "groups": [
+    {
+      "name": "work",
+      "keys": [
+        "/home/work/.ssh/key1",
+        "/home/work/.ssh/key2",
+        "/home/work/.ssh/key3",
+        "/home/work/.ssh/key4"
+      ]
+    },
+    {
+      "name": "priv",
+      "keys": [
+        "/home/gorilla/.ssh/id_rsa",
+        "/home/gorilla/.ssh/deploy_id_rsa",
+        "/home/gorilla/.ssh/gitlab_id_rsa",
+        "/home/gorilla/.ssh/github_id_rsa"
+      ]
+    }
+  ]
+}
