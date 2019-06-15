@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+
+declare -A PASSWORD_CACHE
+
+CONFIG_FILE_PATH="$HOME/.gorillas-ssh-manager.json"
+
+is_password_caching_possible() {
+        local res
+        res=$(command -v expect)
+        if [[ $res != "" ]]; then
+                echo "yes"
+        else
+                echo "no"
+        fi
+}
+
+unlock_password_protected_ssh_key() {
+        local keyfile=$1
+        local password=$2
+expect << EOF
+  spawn ssh-add $keyfile
+  expect "Enter passphrase"
+  send "$password\r"
+  expect eof
+EOF
+}
+
+main() {
+        unset DISPLAY
+        local action
+        local group
+        local result
+
+        while(true); do
+                clear
+                printf "========================\n"
+                printf "| Gorillas SSH Manager |\n"
+                printf "========================\n\n"
+                printf "1. List currently loaded (unlocked) keys\n"
+                printf "2. Add keys of a given group\n"
+                printf "3. Add all keys\n"
+                printf "4. List groups and keys\n"
+                printf "5. Remove keys of a given group\n"
+                printf "6. Remove all keys\n"
+                printf "7. Clear cached key passwords\n"
+                printf "\nSelect: "
+                read -r action
+                printf "\n\n"
+
+                case $action in
+                        1)
+                                echo "Loaded Keys (short)"
+                                ssh-add -l
+                                ;;
+                        2)
+                                printf "Enter group name: "
+                                read -r group
+                                printf "\n\n"
+                                local key
+                                local password
+                                local cache_possible
+                                cache_possible=$(is_password_caching_possible)
+                                printf "Loading keys of %s\n" "$group"
+                                result=$(jq -r ".groups[] | select(.name==\"$group\")" \
+                                        < "$CONFIG_FILE_PATH")
+                                while read -r key; do
+                                        if [[ $cache_possible == "yes" ]]; then
+                                                if [[ "${PASSWORD_CACHE[$key]}" == "" ]]; then
+                                                        printf "Enter password: "
+                                                        read -rs password </dev/tty
+                                                        PASSWORD_CACHE[$key]="$password"
+                                                        echo
+                                                fi
+                                                unlock_password_protected_ssh_key "$key" \
+                                                        "${PASSWORD_CACHE[$key]}"
+                                        else
+                                                ssh-add "$key"
+                                        fi
+                                done < <(echo "$result" | jq -rc '.keys[]')
+                                ;;
+                        3)
+                                local key
+                                local keyset
+                                local password
+                                printf "Loading all available keys\n"
+                                local cache_possible
+                                cache_possible=$(is_password_caching_possible)
+                                result=$(jq -rcM ".groups[]" < "$CONFIG_FILE_PATH")
+                                for keyset in $result; do
+                                        key=$(jq -rc '.keys[]' <<< "$keyset")
+                                        while read -r key; do
+                                                if [[ $cache_possible == "yes" ]]; then
+                                                        if [[ "${PASSWORD_CACHE[$key]}" == "" ]]; then
+                                                                printf "Enter password: "
+                                                                read -rs password </dev/tty
+                                                                PASSWORD_CACHE[$key]="$password"
+                                                                echo
+                                                        fi
+                                                        unlock_password_protected_ssh_key "$key" \
+                                                                "${PASSWORD_CACHE[$key]}"
+                                                else
+                                                        ssh-add "$key"
+                                                fi
+                                        done < <(echo "$result" | jq -rc '.keys[]')
+                                done
+                                ;;
+                        4)
+                                local key
+                                printf "Listing all available groups and keys\n"
+                                result=$(jq -r ".groups[]" \
+                                        < "$CONFIG_FILE_PATH")
+                                echo "$result"
+                                ;;
+                        5)
+                                local key
+                                printf "Enter group name: "
+                                read -r group
+                                printf "\n\n"
+                                printf "Removing keys of %s\n" "$group"
+                                result=$(jq -r ".groups[] | select(.name==\"$group\")" \
+                                        < "$CONFIG_FILE_PATH")
+                                echo "$result" | jq -rc '.keys[]' | while read -r key; do
+                                        ssh-add -d "$key"
+                                done
+                                ;;
+                        6)
+                                printf "Removing all keys\n"
+                                ssh-add -D
+                                ;;
+                        7)
+                                printf "Clearing all cached passwords\n"
+                                unset PASSWORD_CACHE
+                                declare -A PASSWORD_CACHE
+                                ;;
+                        *)
+                                continue
+                                ;;
+                esac
+
+                printf "\nPress [enter] to continue..\n"
+                read -r
+        done
+}
+
+main "$@"
