@@ -66,7 +66,7 @@ main() {
                                 while read -r key; do
                                         if [[ $cache_possible == "yes" ]]; then
                                                 if [[ "${PASSWORD_CACHE[$key]}" == "" ]]; then
-                                                        printf "Enter password: "
+                                                        printf "\n%s\n\nEnter password: " "$key"
                                                         read -rs password </dev/tty
                                                         PASSWORD_CACHE[$key]="$password"
                                                         echo
@@ -91,7 +91,7 @@ main() {
                                         while read -r key; do
                                                 if [[ $cache_possible == "yes" ]]; then
                                                         if [[ "${PASSWORD_CACHE[$key]}" == "" ]]; then
-                                                                printf "Enter password: "
+                                                                printf "\n%s\n\nEnter password: " "$key"
                                                                 read -rs password </dev/tty
                                                                 PASSWORD_CACHE[$key]="$password"
                                                                 echo
